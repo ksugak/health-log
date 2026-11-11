@@ -129,6 +129,23 @@
   .sheet dt { font-weight: 700; font-size: 16px; margin-bottom: 3px; }
   .sheet dd { margin: 0; font-size: 15px; line-height: 1.55; color: var(--sub); }
   .wide { width: 100%; margin-top: 18px; }
+  /* 판정 표시: 색만으로 구분하지 않도록 기호와 글자를 함께 쓴다 */
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 10px; border-radius: 99px; font-weight: 700; font-size: 15px; color: #fff; }
+  .badge i { font-style: normal; }
+  .badge.l0 { background: #0ca30c; }
+  .badge.l1 { background: #fab219; color: #0b0b0b; }
+  .badge.l2 { background: #ec835a; color: #0b0b0b; }
+  .badge.l3 { background: #d03b3b; }
+  .res-name { font-size: 22px; font-weight: 700; margin: 12px 0 2px; }
+  .res-val { font-size: 15px; color: var(--sub); font-variant-numeric: tabular-nums; margin-bottom: 12px; }
+  .sheet p.res-text { font-size: 16px; color: var(--ink); }
+  .sheet p.fine { font-size: 12.5px; color: var(--mute); margin-top: 14px; }
+  .med-q { font-size: 24px; font-weight: 700; margin: 4px 0 8px; }
+  .check { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--ink); font-weight: 500; margin: 10px 0; }
+  .check input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
+  .inline { display: flex; gap: 8px; align-items: flex-end; }
+  .inline label { flex: 1; }
+  .inline label input { font-size: 18px; padding: 11px 10px; }
   .detail-val { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .detail-val small { font-size: 15px; font-weight: 500; color: var(--sub); margin-left: 4px; }
 </style>
@@ -218,11 +235,47 @@
   </div>
 </div>
 
+<!-- 기록 직후: 정상 여부 판정 -->
+<div class="overlay" id="result">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="resName">
+    <span class="badge" id="resBadge"><i id="resIcon"></i><span id="resLevel"></span></span>
+    <div class="res-name" id="resName"></div>
+    <div class="res-val" id="resVal"></div>
+    <p class="res-text" id="resText"></p>
+    <p id="resNote" hidden></p>
+    <form class="inline" id="heightForm" hidden>
+      <label>키 (cm)<input id="heightQuick" type="number" inputmode="decimal" min="100" max="230" step="0.1" placeholder="170"></label>
+      <button class="solid" type="submit">저장</button>
+    </form>
+    <p class="fine">성인 기준(대한고혈압학회·대한비만학회)에 따른 참고용 안내이며 진단이 아니에요. 걱정되면 의사와 상의하세요.</p>
+    <button class="solid wide" type="button" id="resOk">확인</button>
+  </div>
+</div>
+
+<!-- 혈압 기록 직후: 혈압약 확인 -->
+<div class="overlay" id="med">
+  <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="medQ">
+    <div style="font-size:40px">💊</div>
+    <div class="med-q" id="medQ"></div>
+    <p id="medText"></p>
+    <div class="actions" id="medAsk">
+      <button class="line-btn" type="button" id="medNo">아직이요</button>
+      <button class="solid" type="button" id="medYes">먹었어요</button>
+    </div>
+    <button class="solid wide" type="button" id="medOk" hidden>확인</button>
+  </div>
+</div>
+
 <!-- 설정 -->
 <div class="overlay" id="settings">
   <div class="sheet" role="dialog" aria-modal="true">
     <h2>설정</h2>
-    <h3 style="margin-top:0">기록 내보내기</h3>
+    <h3 style="margin-top:0">내 정보</h3>
+    <div class="inline">
+      <label>키 (cm) — 체중 판정에 써요<input id="heightInput" type="number" inputmode="decimal" min="100" max="230" step="0.1" placeholder="170"></label>
+    </div>
+    <label class="check"><input type="checkbox" id="medToggle"> 혈압을 기록하면 혈압약 먹었는지 물어보기</label>
+    <h3>기록 내보내기</h3>
     <p id="countMsg"></p>
     <button class="line-btn" type="button" id="exportBtn">CSV 파일로 저장</button>
     <h3>AI 숫자 읽기</h3>
@@ -244,6 +297,8 @@
     <dl>
       <div><dt>📷 찍어서 기록</dt><dd>혈압계나 체중계 화면을 찍으면 사진이 뜨고, 사진을 보면서 숫자를 입력해 저장해요. 사진은 기록과 함께 남아요.</dd></div>
       <div><dt>⌨️ 직접 입력</dt><dd>사진 없이 숫자만 적을 수도 있어요. 측정 시각을 바꿔 지난 기록도 넣을 수 있어요.</dd></div>
+      <div><dt>🩺 정상 여부 안내</dt><dd>기록하면 성인 기준으로 정상·주의·높음·고위험 중 어디인지 알려 줘요. 체중은 “설정”에 키를 넣어야 판정돼요. 참고용이며 진단이 아니에요.</dd></div>
+      <div><dt>💊 혈압약 확인</dt><dd>혈압을 기록하면 혈압약을 먹었는지 물어봐요. “먹었어요”라고 답하면 그날은 다시 묻지 않아요. 약을 먹지 않는 분은 “설정”에서 끌 수 있어요.</dd></div>
       <div><dt>📈 추이 보기</dt><dd>30일·90일 그래프로 변화를 볼 수 있어요. 그래프를 누르면 그날의 숫자가 보여요.</dd></div>
       <div><dt>🗂 기록 확인·삭제</dt><dd>아래 기록 목록에서 항목을 누르면 사진을 크게 보고 삭제할 수 있어요.</dd></div>
       <div><dt>📄 병원에 보여주기</dt><dd>“설정”의 “CSV 파일로 저장”으로 전체 기록을 표 파일로 내보낼 수 있어요.</dd></div>
@@ -283,6 +338,39 @@ async function store(mode, fn) {
     tx.onerror = tx.onabort = () => rej(tx.error);
   });
 }
+
+// ---------- 내 정보 / 판정 기준 ----------
+const KEY_PROFILE = 'health-log-profile', KEY_MED = 'health-log-med';
+const readJSON = (k, d) => { try { return Object.assign(d, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return d; } };
+const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+const profile = readJSON(KEY_PROFILE, { height: null, medAsk: true });
+
+const LEVEL = [['✓', '정상'], ['!', '주의'], ['▲', '높음'], ['‼', '고위험']];
+
+// 대한고혈압학회 진료지침의 성인 혈압 분류 (나이·성별에 따라 달라지지 않는다)
+function bpClass(sys, dia) {
+  if (sys >= 180 || dia >= 120) return { level: 3, name: '매우 높은 혈압', text: '고위험 범위예요. 5분쯤 편히 쉰 뒤 다시 재 보세요. 다시 재도 비슷하거나 가슴 통증, 심한 두통, 숨참, 시야 흐림이 있으면 바로 진료를 받으세요.' };
+  if (sys >= 160 || dia >= 100) return { level: 3, name: '고혈압 2기', text: '고위험군에 해당하는 범위예요. 며칠 동안 계속 이 정도라면 빠른 시일 안에 진료를 받아 보세요.' };
+  if (sys >= 140 || dia >= 90) return { level: 2, name: dia < 90 ? '수축기 단독 고혈압' : '고혈압 1기', text: '고혈압 범위예요. 한 번의 측정으로 판단하지 말고, 며칠간 같은 시간에 재서 계속 높으면 의사와 상의하세요.' };
+  if (sys >= 130 || dia >= 80) return { level: 1, name: '고혈압 전단계', text: '정상보다 높은 편이에요. 싱겁게 먹기, 운동, 체중 관리가 도움이 돼요.',
+    note: sys >= 135 || dia >= 85 ? '집에서 잰 혈압은 135/85 이상이면 고혈압으로 봐요. 이 수치가 며칠 이어지면 의사와 상의하세요.' : null };
+  if (sys >= 120) return { level: 1, name: '주의혈압', text: '수축기 혈압이 정상보다 조금 높아요. 생활 습관을 살펴보세요.' };
+  if (sys < 90 || dia < 60) return { level: 1, icon: '▼', label: '낮음', name: '낮은 혈압', text: '혈압이 낮은 편이에요. 어지럽거나 기운이 없으면 의사와 상의하세요.' };
+  return { level: 0, name: '정상 혈압', text: '정상 범위예요. 지금처럼 유지하세요.' };
+}
+// 대한비만학회의 성인 체질량지수(BMI) 분류
+function bmiClass(kg, cm) {
+  const m = cm / 100, bmi = Math.round(kg / (m * m) * 10) / 10;
+  const range = `키 ${cm} cm의 정상 체중은 ${(18.5 * m * m).toFixed(1)}~${(22.9 * m * m).toFixed(1)} kg이에요.`;
+  const c = bmi >= 35 ? { level: 3, name: '3단계 비만 (고도비만)', text: '고위험군에 해당하는 범위예요. 체중 관리를 위해 진료를 받아 보세요.' }
+    : bmi >= 30 ? { level: 3, name: '2단계 비만', text: '고위험군에 해당하는 범위예요. 혈압·혈당 관리를 위해서도 체중 감량이 필요해요.' }
+    : bmi >= 25 ? { level: 2, name: '1단계 비만', text: '비만 범위예요. 체중을 줄이면 혈압에도 도움이 돼요.' }
+    : bmi >= 23 ? { level: 1, name: '비만 전단계 (과체중)', text: '정상보다 조금 높아요. 더 늘지 않게 관리해 보세요.' }
+    : bmi >= 18.5 ? { level: 0, name: '정상 체중', text: '정상 범위예요. 지금처럼 유지하세요.' }
+    : { level: 1, icon: '▼', label: '낮음', name: '저체중', text: '정상보다 낮아요. 이유 없이 체중이 줄고 있다면 의사와 상의하세요.' };
+  return { ...c, bmi, note: range };
+}
+const classOf = r => r.type === 'bp' ? bpClass(r.sys, r.dia) : profile.height ? bmiClass(r.kg, profile.height) : null;
 
 let recs = [];      // 최신순
 const byNewest = (a, b) => b.t - a.t || (a.id < b.id ? 1 : -1);
@@ -442,9 +530,20 @@ function render() { renderToday(); renderCharts(); renderHist(); }
 const open = id => { $(id).classList.add('open'); $(id).firstElementChild.scrollTop = 0; };
 const close = id => $(id).classList.remove('open');
 for (const ov of document.querySelectorAll('.overlay')) {
-  ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('[data-close]')) { if (ov.id === 'entry') draft = null; close(ov.id); } });
+  ov.addEventListener('click', e => {
+    if (!(e.target === ov || e.target.closest('[data-close]'))) return;
+    if (ov.id === 'med') return;                    // 혈압약 확인은 버튼으로만 닫는다
+    if (ov.id === 'result') return closeResult();   // 판정 창을 닫으면 혈압약 확인으로 이어진다
+    if (ov.id === 'entry') draft = null;
+    close(ov.id);
+  });
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { draft = null; document.querySelectorAll('.overlay.open').forEach(o => close(o.id)); } });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if ($('med').classList.contains('open')) return;
+  if ($('result').classList.contains('open')) return closeResult();
+  draft = null; document.querySelectorAll('.overlay.open').forEach(o => close(o.id));
+});
 $('helpBtn').onclick = () => open('help');
 
 // ---------- 기록 입력 ----------
@@ -515,7 +614,77 @@ $('entryForm').onsubmit = async e => {
   catch (ex) { console.error(ex); $('entryErr').textContent = '저장하지 못했어요. 기기 저장 공간을 확인해 주세요.'; return; }
   recs.push(rec); recs.sort(byNewest);
   draft = null; close('entry'); render();
+  showResult(rec);
 };
+
+// ---------- 기록 직후: 판정 창 → (혈압이면) 혈압약 확인 창 ----------
+let resultRec = null;
+function showResult(rec) {
+  resultRec = rec;
+  const c = classOf(rec);
+  $('resBadge').hidden = !c;
+  $('heightForm').hidden = !!c;
+  if (c) {
+    $('resBadge').className = `badge l${c.level}`;
+    $('resIcon').textContent = c.icon || LEVEL[c.level][0];
+    $('resLevel').textContent = c.label || LEVEL[c.level][1];
+    $('resName').textContent = c.name;
+    $('resVal').textContent = rec.type === 'bp' ? `${rec.sys} / ${rec.dia} mmHg` : `${kgText(rec.kg)} kg · 체질량지수(BMI) ${c.bmi.toFixed(1)}`;
+    $('resText').textContent = c.text;
+    $('resNote').hidden = !c.note; $('resNote').textContent = c.note || '';
+  } else {
+    $('resName').textContent = '체중을 기록했어요';
+    $('resVal').textContent = `${kgText(rec.kg)} kg`;
+    $('resText').textContent = '키를 입력하면 정상 체중인지 알려 드려요.';
+    $('resNote').hidden = true; $('heightQuick').value = '';
+  }
+  open('result');
+}
+function closeResult() {
+  if (!$('result').classList.contains('open')) return;
+  close('result');
+  const rec = resultRec; resultRec = null;
+  if (rec && rec.type === 'bp') askMed(rec);
+}
+$('resOk').onclick = closeResult;
+$('heightForm').onsubmit = e => {
+  e.preventDefault();
+  const h = Number($('heightQuick').value);
+  if (!(h >= 100 && h <= 230)) { $('heightQuick').focus(); return; }
+  profile.height = Math.round(h * 10) / 10; writeJSON(KEY_PROFILE, profile);
+  showResult(resultRec);
+};
+
+let medRec = null;
+function askMed(rec) {
+  if (!profile.medAsk) return;
+  const today = dayKey(Date.now());
+  if (dayKey(rec.t) !== today) return;                        // 지난 날짜를 뒤늦게 적는 중이면 묻지 않는다
+  if (readJSON(KEY_MED, {}).day === today) { setMed(rec, true); return; }   // 오늘 이미 먹었다고 답했다
+  medRec = rec;
+  $('medQ').textContent = '혈압약 드셨나요?';
+  $('medText').textContent = '오늘 혈압약을 먹었는지 확인해 주세요.';
+  $('medAsk').hidden = false; $('medOk').hidden = true;
+  open('med');
+}
+function setMed(rec, taken) {
+  rec.med = taken;
+  store('readwrite', s => s.put(rec)).catch(console.error);
+}
+$('medYes').onclick = () => {
+  writeJSON(KEY_MED, { day: dayKey(Date.now()) });
+  if (medRec) setMed(medRec, true);
+  medRec = null; close('med'); renderHist();
+};
+$('medNo').onclick = () => {
+  if (medRec) setMed(medRec, false);
+  medRec = null;
+  $('medQ').textContent = '잊지 말고 챙겨 드세요';
+  $('medText').textContent = '지금 바로 혈압약을 챙겨 드세요. 다음에 혈압을 기록할 때 다시 물어볼게요.';
+  $('medAsk').hidden = true; $('medOk').hidden = false;
+  renderHist();
+};
+$('medOk').onclick = () => close('med');
 
 // ---------- 기록 상세 ----------
 let viewing = null;
@@ -523,7 +692,13 @@ function openDetail(r) {
   viewing = r;
   $('detailPhoto').hidden = !r.photo; if (r.photo) $('detailPhoto').src = r.photo;
   $('detailVal').replaceChildren(...valueNodes(r));
-  $('detailWhen').textContent = `${TYPE[r.type]} · ${mdw(r.t)} ${hhmm(r.t)}` + (r.ai ? ' · AI가 읽은 숫자' : '');
+  const c = classOf(r);
+  $('detailWhen').textContent = [
+    `${TYPE[r.type]} · ${mdw(r.t)} ${hhmm(r.t)}`,
+    c ? (r.type === 'wt' ? `BMI ${c.bmi.toFixed(1)} · ${c.name}` : c.name) : null,
+    r.med === true ? '혈압약 먹음' : r.med === false ? '혈압약 아직' : null,
+    r.ai ? 'AI가 읽은 숫자' : null,
+  ].filter(Boolean).join(' · ');
   open('detail');
 }
 $('detailClose').onclick = () => close('detail');
@@ -539,14 +714,24 @@ $('setBtn').onclick = () => { renderSettings(); open('settings'); };
 function renderSettings() {
   $('countMsg').textContent = recs.length ? `혈압 ${ofType('bp').length}개, 체중 ${ofType('wt').length}개가 저장돼 있어요. 사진은 내보내지 않아요.` : '아직 저장된 기록이 없어요.';
   $('exportBtn').disabled = !recs.length;
+  $('heightInput').value = profile.height ?? '';
+  $('medToggle').checked = profile.medAsk;
   $('aiState').textContent = hasKey()
     ? '켜져 있어요. 사진을 찍으면 AI가 숫자를 읽어 채워 줘요.'
     : '꺼져 있어요. API 키를 넣으면 사진 속 숫자를 AI가 읽어 채워 줘요.';
   $('keyClear').hidden = !hasKey();
 }
+$('heightInput').onchange = () => {
+  const h = Number($('heightInput').value);
+  profile.height = h >= 100 && h <= 230 ? Math.round(h * 10) / 10 : null;
+  if (profile.height === null) $('heightInput').value = '';
+  writeJSON(KEY_PROFILE, profile);
+};
+$('medToggle').onchange = () => { profile.medAsk = $('medToggle').checked; writeJSON(KEY_PROFILE, profile); };
 $('exportBtn').onclick = () => {
-  const rows = [['날짜', '시간', '종류', '수축기', '이완기', '맥박', '체중(kg)']];
-  for (const r of [...recs].reverse()) rows.push([dayKey(r.t), hhmm(r.t), TYPE[r.type], r.sys ?? '', r.dia ?? '', r.pulse ?? '', r.kg ?? '']);
+  const rows = [['날짜', '시간', '종류', '수축기', '이완기', '맥박', '체중(kg)', '분류', '혈압약']];
+  for (const r of [...recs].reverse()) rows.push([dayKey(r.t), hhmm(r.t), TYPE[r.type], r.sys ?? '', r.dia ?? '', r.pulse ?? '', r.kg ?? '',
+    classOf(r)?.name ?? '', r.med === true ? '먹음' : r.med === false ? '아직' : '']);
   const blob = new Blob(['﻿' + rows.map(r => r.join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = el('a'); a.href = URL.createObjectURL(blob); a.download = `혈압체중_${dayKey(Date.now())}.csv`;
   document.body.append(a); a.click(); a.remove();
