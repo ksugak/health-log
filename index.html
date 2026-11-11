@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f1efe9">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="혈압·체중">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>혈압·체중 수첩</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f1efe9; --card: #fcfcfb; --ink: #0b0b0b; --sub: #52514e; --mute: #8a8880;
+    --line: #e3e0d6; --accent: #1f5fae; --on-accent: #ffffff; --warn: #b4472e;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;   /* 수축기 / 이완기 / 체중 */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #101010; --card: #1a1a19; --ink: #f0efec; --sub: #c3c2b7; --mute: #8f8e86;
+      --line: #2e2e2b; --accent: #6aa5ee; --on-accent: #0b1320; --warn: #e58a72;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 28px);
+  }
+  main { max-width: 480px; margin: 0 auto; padding: 20px 16px; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .date { font-size: 14px; color: var(--sub); }
+  h1 { margin: 2px 0 0; font-size: 26px; letter-spacing: -0.02em; }
+  h2 { font-size: 17px; margin: 0; }
+  .head-btns { display: flex; align-items: center; gap: 4px; }
+  .round {
+    width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--sub);
+    color: var(--sub); font-weight: 700; font-size: 16px; line-height: 1; display: grid; place-items: center;
+  }
+  .ghost { padding: 8px 12px; border-radius: 10px; color: var(--sub); font-size: 14px; }
+  .ghost:active, .round:active { background: var(--line); }
+  .solid { background: var(--accent); color: var(--on-accent); padding: 13px 16px; border-radius: 12px; font-weight: 700; }
+  .solid:active { opacity: .7; }
+
+  .today { display: grid; gap: 12px; margin-top: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  .k { font-size: 14px; color: var(--sub); font-weight: 600; }
+  .v { font-size: 38px; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .v small { font-size: 15px; font-weight: 500; color: var(--sub); margin-left: 4px; letter-spacing: 0; }
+  .v.none { font-size: 18px; font-weight: 500; color: var(--mute); padding: 10px 0; }
+  .s { font-size: 14px; color: var(--sub); min-height: 20px; }
+  .row { display: flex; gap: 6px; align-items: center; margin-top: 12px; }
+  .row .solid { flex: 1; }
+
+  .sec-head { display: flex; align-items: center; justify-content: space-between; margin: 28px 0 10px; }
+  .seg { display: flex; background: var(--line); border-radius: 10px; padding: 3px; }
+  .seg button { padding: 6px 14px; border-radius: 8px; font-size: 14px; color: var(--sub); }
+  .seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); font-weight: 700; }
+
+  figure.chart { margin: 0 0 12px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 12px 10px; }
+  .chart-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 0 4px 6px; }
+  figcaption { font-size: 15px; font-weight: 700; }
+  figcaption small { font-weight: 500; color: var(--mute); font-size: 12px; margin-left: 4px; }
+  .legend { display: flex; gap: 12px; font-size: 13px; color: var(--sub); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+  .plot { position: relative; touch-action: pan-y; }
+  .plot svg { display: block; width: 100%; height: auto; }
+  .plot text { font-size: 11px; fill: var(--mute); font-variant-numeric: tabular-nums; }
+  .plot text.last { fill: var(--ink); font-size: 12px; font-weight: 700; }
+  .empty { color: var(--mute); font-size: 14px; text-align: center; padding: 34px 0; }
+  .tip {
+    position: absolute; top: 0; pointer-events: none; display: none; z-index: 2;
+    background: var(--ink); color: var(--card); border-radius: 10px; padding: 8px 10px;
+    font-size: 12px; line-height: 1.5; white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .tip b { font-size: 13px; }
+  .tip .sw { width: 8px; height: 8px; margin-right: 5px; }
+
+  #hist { list-style: none; margin: 0; padding: 0; background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  #hist li + li { border-top: 1px solid var(--line); }
+  #hist button { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left; min-height: 60px; }
+  #hist button:active { background: var(--line); }
+  .h-main { flex: 1; min-width: 0; }
+  .h-val { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .h-val small { font-weight: 500; color: var(--sub); font-size: 13px; margin-left: 4px; }
+  .h-when { font-size: 13px; color: var(--sub); font-variant-numeric: tabular-nums; }
+  .thumb { width: 44px; height: 44px; border-radius: 9px; object-fit: cover; flex: none; }
+  .more { text-align: center; color: var(--mute); font-size: 13px; margin-top: 10px; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
+  .overlay.open { display: flex; }
+  .sheet {
+    background: var(--card); width: 100%; max-width: 480px; max-height: 92dvh; overflow-y: auto;
+    border-radius: 20px 20px 0 0; padding: 22px 20px calc(env(safe-area-inset-bottom) + 20px);
+  }
+  @media (min-width: 520px) { .overlay { align-items: center; } .sheet { border-radius: 20px; } }
+  .sheet h2 { font-size: 21px; margin-bottom: 14px; }
+  .photo { width: 100%; max-height: 38dvh; object-fit: contain; border-radius: 12px; background: #000; display: block; margin-bottom: 10px; }
+  .msg { font-size: 14px; color: var(--sub); margin: 0 0 12px; min-height: 20px; }
+  .err { font-size: 14px; color: var(--warn); margin: 8px 0 0; min-height: 20px; }
+  .fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .fields.one { grid-template-columns: 1fr; }
+  label { display: block; font-size: 13px; color: var(--sub); font-weight: 600; }
+  label input {
+    display: block; width: 100%; margin-top: 4px; padding: 12px 10px; font-size: 22px; font-weight: 700;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--bg); text-align: center; font-variant-numeric: tabular-nums;
+  }
+  label.when { margin-top: 12px; }
+  label.when input, label.key input { font-size: 16px; font-weight: 500; text-align: left; }
+  .actions { display: flex; gap: 8px; margin-top: 16px; }
+  .actions .solid { flex: 1; }
+  .line-btn { padding: 13px 16px; border-radius: 12px; border: 1px solid var(--line); font-weight: 600; }
+  .line-btn.danger { color: var(--warn); }
+  .sheet p { font-size: 14px; line-height: 1.55; color: var(--sub); margin: 0 0 10px; }
+  .sheet h3 { font-size: 16px; margin: 20px 0 6px; }
+  .sheet dl { margin: 0; display: grid; gap: 14px; }
+  .sheet dt { font-weight: 700; font-size: 16px; margin-bottom: 3px; }
+  .sheet dd { margin: 0; font-size: 15px; line-height: 1.55; color: var(--sub); }
+  .wide { width: 100%; margin-top: 18px; }
+  .detail-val { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .detail-val small { font-size: 15px; font-weight: 500; color: var(--sub); margin-left: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="date" id="date"></div>
+      <h1>혈압·체중 수첩</h1>
+    </div>
+    <div class="head-btns">
+      <button class="round" id="helpBtn" type="button" aria-label="사용 방법">?</button>
+      <button class="ghost" id="setBtn" type="button">설정</button>
+    </div>
+  </header>
+
+  <section class="today">
+    <article class="card">
+      <div class="k">혈압</div>
+      <div class="v" id="bpVal"></div>
+      <div class="s" id="bpSub"></div>
+      <div class="row">
+        <button class="solid" type="button" data-shoot="bp">📷 찍어서 기록</button>
+        <button class="ghost" type="button" data-manual="bp">직접 입력</button>
+      </div>
+    </article>
+    <article class="card">
+      <div class="k">체중</div>
+      <div class="v" id="wtVal"></div>
+      <div class="s" id="wtSub"></div>
+      <div class="row">
+        <button class="solid" type="button" data-shoot="wt">📷 찍어서 기록</button>
+        <button class="ghost" type="button" data-manual="wt">직접 입력</button>
+      </div>
+    </article>
+  </section>
+
+  <div class="sec-head">
+    <h2>추이</h2>
+    <div class="seg" role="group" aria-label="기간">
+      <button type="button" data-range="30" aria-pressed="true">30일</button>
+      <button type="button" data-range="90" aria-pressed="false">90일</button>
+    </div>
+  </div>
+  <figure class="chart" id="bpChart"></figure>
+  <figure class="chart" id="wtChart"></figure>
+
+  <div class="sec-head"><h2>기록</h2></div>
+  <ul id="hist"></ul>
+  <p class="more" id="more" hidden></p>
+</main>
+
+<!-- 기록 입력 -->
+<div class="overlay" id="entry">
+  <form class="sheet" id="entryForm" role="dialog" aria-modal="true" aria-labelledby="entryTitle" novalidate>
+    <h2 id="entryTitle"></h2>
+    <img class="photo" id="entryPhoto" alt="찍은 사진" hidden>
+    <p class="msg" id="entryMsg"></p>
+    <div class="fields" id="bpFields">
+      <label>수축기(최고)<input id="inSys" type="number" inputmode="numeric" min="50" max="300" placeholder="120"></label>
+      <label>이완기(최저)<input id="inDia" type="number" inputmode="numeric" min="30" max="200" placeholder="80"></label>
+      <label>맥박(선택)<input id="inPulse" type="number" inputmode="numeric" min="30" max="250" placeholder="70"></label>
+    </div>
+    <div class="fields one" id="wtFields">
+      <label>체중 (kg)<input id="inKg" type="number" inputmode="decimal" step="0.1" min="20" max="300" placeholder="70.0"></label>
+    </div>
+    <label class="when">측정 시각<input id="inWhen" type="datetime-local"></label>
+    <p class="err" id="entryErr"></p>
+    <div class="actions">
+      <button class="line-btn" type="button" id="entryCancel">취소</button>
+      <button class="solid" type="submit">저장</button>
+    </div>
+  </form>
+</div>
+
+<!-- 기록 상세 -->
+<div class="overlay" id="detail">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <img class="photo" id="detailPhoto" alt="기록 사진" hidden>
+    <div class="detail-val" id="detailVal"></div>
+    <p id="detailWhen" style="margin-top:4px"></p>
+    <div class="actions">
+      <button class="line-btn danger" type="button" id="detailDel">삭제</button>
+      <button class="solid" type="button" id="detailClose">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 설정 -->
+<div class="overlay" id="settings">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>설정</h2>
+    <h3 style="margin-top:0">기록 내보내기</h3>
+    <p id="countMsg"></p>
+    <button class="line-btn" type="button" id="exportBtn">CSV 파일로 저장</button>
+    <h3>AI 숫자 읽기</h3>
+    <p id="aiState"></p>
+    <form id="keyForm" class="actions" style="margin-top:0">
+      <label class="key" style="flex:1"><input id="keyInput" type="password" placeholder="Anthropic API 키 (sk-ant-...)" autocomplete="off" aria-label="Anthropic API 키" style="margin-top:0"></label>
+      <button class="solid" type="submit">저장</button>
+    </form>
+    <button class="ghost" type="button" id="keyClear" style="color:var(--warn);padding-left:0">키 삭제</button>
+    <p>키는 이 기기에만 저장되고, 사진의 숫자를 읽을 때 사진과 함께 Anthropic으로만 전송돼요. 읽을 때마다 소액의 API 요금이 들어요.</p>
+    <button class="solid wide" type="button" data-close>닫기</button>
+  </div>
+</div>
+
+<!-- 사용 방법 -->
+<div class="overlay" id="help">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h2>사용 방법</h2>
+    <dl>
+      <div><dt>📷 찍어서 기록</dt><dd>혈압계나 체중계 화면을 찍으면 사진이 뜨고, 사진을 보면서 숫자를 입력해 저장해요. 사진은 기록과 함께 남아요.</dd></div>
+      <div><dt>⌨️ 직접 입력</dt><dd>사진 없이 숫자만 적을 수도 있어요. 측정 시각을 바꿔 지난 기록도 넣을 수 있어요.</dd></div>
+      <div><dt>📈 추이 보기</dt><dd>30일·90일 그래프로 변화를 볼 수 있어요. 그래프를 누르면 그날의 숫자가 보여요.</dd></div>
+      <div><dt>🗂 기록 확인·삭제</dt><dd>아래 기록 목록에서 항목을 누르면 사진을 크게 보고 삭제할 수 있어요.</dd></div>
+      <div><dt>📄 병원에 보여주기</dt><dd>“설정”의 “CSV 파일로 저장”으로 전체 기록을 표 파일로 내보낼 수 있어요.</dd></div>
+      <div><dt>🤖 AI 숫자 읽기 (선택)</dt><dd>“설정”에 Anthropic API 키를 넣으면 사진 속 숫자를 AI가 읽어 채워 줘요. 저장하기 전에 숫자가 맞는지 꼭 확인하세요.</dd></div>
+      <div><dt>🔒 내 기록은 내 폰에만</dt><dd>기록과 사진은 이 기기에만 저장돼요. 앱이나 브라우저 데이터를 지우면 함께 사라지니 가끔 내보내 두세요.</dd></div>
+    </dl>
+    <button class="solid wide" type="button" data-close>확인</button>
+  </div>
+</div>
+
+<input type="file" id="cam" accept="image/*" capture="environment" hidden>
+
+<script>
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+const pad = n => String(n).padStart(2, '0');
+const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const hhmm = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const md = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()}`; };
+const mdw = t => new Date(t).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' });
+const kgText = kg => kg.toFixed(1);
+const TYPE = { bp: '혈압', wt: '체중' };
+
+// ---------- 저장소 (IndexedDB: 사진까지 넉넉하게 담는다) ----------
+const dbReady = new Promise((res, rej) => {
+  const r = indexedDB.open('health-log', 1);
+  r.onupgradeneeded = () => r.result.createObjectStore('records', { keyPath: 'id' });
+  r.onsuccess = () => res(r.result);
+  r.onerror = () => rej(r.error);
+});
+async function store(mode, fn) {
+  const db = await dbReady;
+  return new Promise((res, rej) => {
+    const tx = db.transaction('records', mode);
+    const req = fn(tx.objectStore('records'));
+    tx.oncomplete = () => res(req.result);
+    tx.onerror = tx.onabort = () => rej(tx.error);
+  });
+}
+
+let recs = [];      // 최신순
+const byNewest = (a, b) => b.t - a.t || (a.id < b.id ? 1 : -1);
+let rangeDays = 30;
+const ofType = type => recs.filter(r => r.type === type);
+
+// ---------- 오늘 카드 ----------
+function setVal(node, main, unit) {
+  node.className = 'v';
+  node.replaceChildren(document.createTextNode(main), el('small', null, unit));
+}
+function renderToday() {
+  $('date').textContent = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
+  const today = dayKey(Date.now());
+
+  const bps = ofType('bp'), bp = bps[0];
+  if (!bp) { $('bpVal').className = 'v none'; $('bpVal').textContent = '아직 기록이 없어요'; $('bpSub').textContent = ''; }
+  else {
+    setVal($('bpVal'), `${bp.sys} / ${bp.dia}`, 'mmHg');
+    const isToday = dayKey(bp.t) === today;
+    const n = bps.filter(r => dayKey(r.t) === today).length;
+    $('bpSub').textContent = [
+      isToday ? `오늘 ${hhmm(bp.t)}` : `마지막 기록 ${mdw(bp.t)}`,
+      bp.pulse ? `맥박 ${bp.pulse}` : null,
+      n > 1 ? `오늘 ${n}번 측정` : null,
+    ].filter(Boolean).join(' · ');
+  }
+
+  const wts = ofType('wt'), wt = wts[0], prev = wts[1];
+  if (!wt) { $('wtVal').className = 'v none'; $('wtVal').textContent = '아직 기록이 없어요'; $('wtSub').textContent = ''; }
+  else {
+    setVal($('wtVal'), kgText(wt.kg), 'kg');
+    const isToday = dayKey(wt.t) === today;
+    let diff = null;
+    if (prev) {
+      const d = Math.round((wt.kg - prev.kg) * 10) / 10;
+      diff = d === 0 ? '지난 기록과 같아요' : `지난 기록보다 ${d > 0 ? '+' : '−'}${Math.abs(d).toFixed(1)} kg`;
+    }
+    $('wtSub').textContent = [isToday ? `오늘 ${hhmm(wt.t)}` : `마지막 기록 ${mdw(wt.t)}`, diff].filter(Boolean).join(' · ');
+  }
+}
+
+// ---------- 그래프 ----------
+const NS = 'http://www.w3.org/2000/svg';
+const sv = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+
+function niceScale(min, max) {
+  if (min === max) { min -= 1; max += 1; }
+  const raw = (max - min) / 4, pow = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map(m => m * pow).find(s => s >= raw - 1e-9);
+  return { lo: Math.floor(min / step + 1e-9) * step, hi: Math.ceil(max / step - 1e-9) * step, step };
+}
+
+function drawChart(fig, title, unit, series, type, fmt) {
+  const now = Date.now(), from = now - rangeDays * 864e5;
+  const data = ofType(type).filter(r => r.t >= from && r.t <= now).reverse();   // 시간순
+  fig.replaceChildren();
+  const top = el('div', 'chart-top');
+  const cap = el('figcaption', null, title); cap.append(el('small', null, unit));
+  top.append(cap);
+  if (series.length > 1) {
+    const lg = el('div', 'legend');
+    for (const s of series) { const item = el('span'); const sw = el('i', 'sw'); sw.style.background = `var(${s.color})`; item.append(sw, s.name); lg.append(item); }
+    top.append(lg);
+  }
+  fig.append(top);
+  if (!data.length) { fig.append(el('div', 'empty', `최근 ${rangeDays}일 동안 기록이 없어요`)); return; }
+
+  const plot = el('div', 'plot'); fig.append(plot);
+  const W = Math.max(280, plot.clientWidth || 320), H = 172, L = 34, R = 38, T = 12, B = 24;
+  const vals = data.flatMap(r => series.map(s => r[s.key]));
+  const sc = niceScale(Math.min(...vals), Math.max(...vals));
+  const x = t => L + (t - from) / (now - from) * (W - L - R);
+  const y = v => T + (sc.hi - v) / (sc.hi - sc.lo) * (H - T - B);
+  const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `${title} 최근 ${rangeDays}일 그래프` });
+
+  for (let v = sc.lo; v <= sc.hi + 1e-9; v += sc.step) {
+    svg.append(sv('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: 'var(--line)', 'stroke-width': 1 }));
+    const tx = sv('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end' }); tx.textContent = sc.step < 1 ? v.toFixed(1) : Math.round(v); svg.append(tx);
+  }
+  [[from, 'start', md(from)], [(from + now) / 2, 'middle', md((from + now) / 2)], [now, 'end', '오늘']].forEach(([t, anchor, label]) => {
+    const tx = sv('text', { x: x(t), y: H - 6, 'text-anchor': anchor }); tx.textContent = label; svg.append(tx);
+  });
+
+  const cross = sv('line', { y1: T, y2: H - B, stroke: 'var(--mute)', 'stroke-width': 1, visibility: 'hidden' });
+  svg.append(cross);
+  const showDots = data.length <= 31;
+  const last = data[data.length - 1];
+  const labelYs = [];
+  for (const s of series) {
+    const pts = data.map(r => `${x(r.t).toFixed(1)},${y(r[s.key]).toFixed(1)}`);
+    if (pts.length > 1) svg.append(sv('polyline', { points: pts.join(' '), fill: 'none', stroke: `var(${s.color})`, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    if (showDots) for (const r of data) svg.append(sv('circle', { cx: x(r.t), cy: y(r[s.key]), r: 4, fill: `var(${s.color})`, stroke: 'var(--card)', 'stroke-width': 2 }));
+    // 마지막 값은 선 끝에 직접 적는다 (겹치면 아래로 민다)
+    let ly = y(last[s.key]) + 4;
+    for (const used of labelYs) if (Math.abs(used - ly) < 13) ly = used + 13;
+    labelYs.push(ly);
+    const tx = sv('text', { x: Math.min(x(last.t) + 8, W - R + 6), y: ly, class: 'last' }); tx.textContent = fmt(last[s.key]); svg.append(tx);
+  }
+  const hi = series.map(s => { const c = sv('circle', { r: 6, fill: `var(${s.color})`, stroke: 'var(--card)', 'stroke-width': 2, visibility: 'hidden' }); svg.append(c); return c; });
+  plot.append(svg);
+
+  const tip = el('div', 'tip'); plot.append(tip);
+  const move = e => {
+    const box = svg.getBoundingClientRect(), px = (e.clientX - box.left) * W / box.width;
+    let best = data[0];
+    for (const r of data) if (Math.abs(x(r.t) - px) < Math.abs(x(best.t) - px)) best = r;
+    const bx = x(best.t);
+    cross.setAttribute('x1', bx); cross.setAttribute('x2', bx); cross.setAttribute('visibility', 'visible');
+    series.forEach((s, i) => { hi[i].setAttribute('cx', bx); hi[i].setAttribute('cy', y(best[s.key])); hi[i].setAttribute('visibility', 'visible'); });
+    tip.replaceChildren(el('div', null, `${mdw(best.t)} ${hhmm(best.t)}`));
+    for (const s of series) {
+      const row = el('div'); const sw = el('i', 'sw'); sw.style.background = `var(${s.color})`;
+      row.append(sw, `${s.name} `, el('b', null, fmt(best[s.key]))); tip.append(row);
+    }
+    if (type === 'bp' && best.pulse) tip.append(el('div', null, `맥박 ${best.pulse}`));
+    tip.style.display = 'block';
+    const left = bx * box.width / W, tw = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(box.width - tw, left > box.width / 2 ? left - tw - 10 : left + 10)) + 'px';
+  };
+  const leave = () => { tip.style.display = 'none'; cross.setAttribute('visibility', 'hidden'); hi.forEach(c => c.setAttribute('visibility', 'hidden')); };
+  plot.addEventListener('pointerdown', move); plot.addEventListener('pointermove', move);
+  plot.addEventListener('pointerleave', leave); plot.addEventListener('pointercancel', leave);
+}
+
+function renderCharts() {
+  drawChart($('bpChart'), '혈압', 'mmHg', [{ key: 'sys', name: '수축기', color: '--s1' }, { key: 'dia', name: '이완기', color: '--s2' }], 'bp', v => String(v));
+  drawChart($('wtChart'), '체중', 'kg', [{ key: 'kg', name: '체중', color: '--s3' }], 'wt', kgText);
+}
+
+// ---------- 기록 목록 ----------
+const HIST_MAX = 100;
+function valueNodes(r) {
+  return r.type === 'bp'
+    ? [document.createTextNode(`${r.sys} / ${r.dia}`), el('small', null, r.pulse ? `mmHg · 맥박 ${r.pulse}` : 'mmHg')]
+    : [document.createTextNode(kgText(r.kg)), el('small', null, 'kg')];
+}
+function renderHist() {
+  const list = $('hist'); list.replaceChildren();
+  if (!recs.length) { const li = el('li'); li.append(el('div', 'empty', '첫 기록을 남겨 보세요')); list.append(li); }
+  for (const r of recs.slice(0, HIST_MAX)) {
+    const li = el('li'), b = el('button'); b.type = 'button';
+    const main = el('div', 'h-main'), val = el('div', 'h-val');
+    val.append(...valueNodes(r));
+    main.append(val, el('div', 'h-when', `${TYPE[r.type]} · ${mdw(r.t)} ${hhmm(r.t)}`));
+    b.append(main);
+    if (r.photo) { const img = el('img', 'thumb'); img.src = r.photo; img.alt = ''; img.loading = 'lazy'; b.append(img); }
+    b.onclick = () => openDetail(r);
+    li.append(b); list.append(li);
+  }
+  $('more').hidden = recs.length <= HIST_MAX;
+  $('more').textContent = `최근 ${HIST_MAX}개만 보여요. 전체 ${recs.length}개는 “설정”에서 내보낼 수 있어요.`;
+}
+function render() { renderToday(); renderCharts(); renderHist(); }
+
+// ---------- 화면 겹침(시트) ----------
+const open = id => { $(id).classList.add('open'); $(id).firstElementChild.scrollTop = 0; };
+const close = id => $(id).classList.remove('open');
+for (const ov of document.querySelectorAll('.overlay')) {
+  ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('[data-close]')) { if (ov.id === 'entry') draft = null; close(ov.id); } });
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { draft = null; document.querySelectorAll('.overlay.open').forEach(o => close(o.id)); } });
+$('helpBtn').onclick = () => open('help');
+
+// ---------- 기록 입력 ----------
+let draft = null, camType = null;
+const whenValue = t => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+
+function openEntry(type, photo, full) {
+  draft = { type, photo: photo || null };
+  $('entryTitle').textContent = `${TYPE[type]} 기록`;
+  $('bpFields').hidden = type !== 'bp'; $('wtFields').hidden = type !== 'wt';
+  for (const id of ['inSys', 'inDia', 'inPulse', 'inKg']) $(id).value = '';
+  $('inWhen').value = draft.when0 = whenValue(Date.now());
+  $('entryErr').textContent = '';
+  $('entryPhoto').hidden = !photo; if (photo) $('entryPhoto').src = photo;
+  $('entryMsg').textContent = !photo ? '숫자를 입력해 주세요.' : hasKey() ? 'AI가 사진의 숫자를 읽는 중…' : '사진을 보고 숫자를 입력해 주세요.';
+  open('entry');
+  if (photo && hasKey()) fillFromPhoto(draft, full);
+  else setTimeout(() => $(type === 'bp' ? 'inSys' : 'inKg').focus(), 50);
+}
+
+document.querySelectorAll('[data-manual]').forEach(b => b.onclick = () => openEntry(b.dataset.manual));
+document.querySelectorAll('[data-shoot]').forEach(b => b.onclick = () => { camType = b.dataset.shoot; $('cam').value = ''; $('cam').click(); });
+$('cam').onchange = e => {
+  const file = e.target.files[0]; if (!file || !camType) return;
+  const type = camType; camType = null;
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => {
+    const shrink = (max, q) => {
+      const s = Math.min(1, max / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      return cv.toDataURL('image/jpeg', q);
+    };
+    // 보관용은 작게, AI가 읽을 사진은 숫자가 또렷하도록 크게
+    const thumb = shrink(560, 0.6), full = hasKey() ? shrink(1280, 0.8) : null;
+    URL.revokeObjectURL(url);
+    openEntry(type, thumb, full);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); alert('사진을 불러오지 못했어요. 다시 시도해 주세요.'); };
+  img.src = url;
+};
+
+$('entryCancel').onclick = () => { draft = null; close('entry'); };
+$('entryForm').onsubmit = async e => {
+  e.preventDefault();
+  if (!draft) return;
+  const num = id => $(id).value.trim() === '' ? null : Number($(id).value);
+  // 시각을 손대지 않았으면 지금 시각을 초 단위까지 쓴다 (같은 분에 잰 기록도 순서가 맞도록)
+  const t = $('inWhen').value === draft.when0 ? Date.now() : new Date($('inWhen').value).getTime();
+  const rec = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, type: draft.type, t, photo: draft.photo, ai: !!draft.ai };
+  let err = '';
+  if (!Number.isFinite(t)) err = '측정 시각을 확인해 주세요.';
+  else if (t > Date.now() + 6e4) err = '측정 시각이 지금보다 뒤예요.';
+  else if (draft.type === 'bp') {
+    const sys = num('inSys'), dia = num('inDia'), pulse = num('inPulse');
+    if (!Number.isInteger(sys) || sys < 50 || sys > 300) err = '수축기 혈압을 50~300 사이로 입력해 주세요.';
+    else if (!Number.isInteger(dia) || dia < 30 || dia > 200) err = '이완기 혈압을 30~200 사이로 입력해 주세요.';
+    else if (dia >= sys) err = '수축기가 이완기보다 커야 해요. 숫자를 확인해 주세요.';
+    else if (pulse !== null && (!Number.isInteger(pulse) || pulse < 30 || pulse > 250)) err = '맥박을 30~250 사이로 입력하거나 비워 두세요.';
+    Object.assign(rec, { sys, dia, pulse });
+  } else {
+    const kg = num('inKg');
+    if (kg === null || !Number.isFinite(kg) || kg < 20 || kg > 300) err = '체중을 20~300 kg 사이로 입력해 주세요.';
+    else rec.kg = Math.round(kg * 10) / 10;
+  }
+  if (err) { $('entryErr').textContent = err; return; }
+  try { await store('readwrite', s => s.put(rec)); }
+  catch (ex) { console.error(ex); $('entryErr').textContent = '저장하지 못했어요. 기기 저장 공간을 확인해 주세요.'; return; }
+  recs.push(rec); recs.sort(byNewest);
+  draft = null; close('entry'); render();
+};
+
+// ---------- 기록 상세 ----------
+let viewing = null;
+function openDetail(r) {
+  viewing = r;
+  $('detailPhoto').hidden = !r.photo; if (r.photo) $('detailPhoto').src = r.photo;
+  $('detailVal').replaceChildren(...valueNodes(r));
+  $('detailWhen').textContent = `${TYPE[r.type]} · ${mdw(r.t)} ${hhmm(r.t)}` + (r.ai ? ' · AI가 읽은 숫자' : '');
+  open('detail');
+}
+$('detailClose').onclick = () => close('detail');
+$('detailDel').onclick = async () => {
+  if (!viewing || !confirm('이 기록을 삭제할까요? 되돌릴 수 없어요.')) return;
+  await store('readwrite', s => s.delete(viewing.id));
+  recs = recs.filter(r => r.id !== viewing.id);
+  close('detail'); render();
+};
+
+// ---------- 설정: 내보내기 ----------
+$('setBtn').onclick = () => { renderSettings(); open('settings'); };
+function renderSettings() {
+  $('countMsg').textContent = recs.length ? `혈압 ${ofType('bp').length}개, 체중 ${ofType('wt').length}개가 저장돼 있어요. 사진은 내보내지 않아요.` : '아직 저장된 기록이 없어요.';
+  $('exportBtn').disabled = !recs.length;
+  $('aiState').textContent = hasKey()
+    ? '켜져 있어요. 사진을 찍으면 AI가 숫자를 읽어 채워 줘요.'
+    : '꺼져 있어요. API 키를 넣으면 사진 속 숫자를 AI가 읽어 채워 줘요.';
+  $('keyClear').hidden = !hasKey();
+}
+$('exportBtn').onclick = () => {
+  const rows = [['날짜', '시간', '종류', '수축기', '이완기', '맥박', '체중(kg)']];
+  for (const r of [...recs].reverse()) rows.push([dayKey(r.t), hhmm(r.t), TYPE[r.type], r.sys ?? '', r.dia ?? '', r.pulse ?? '', r.kg ?? '']);
+  const blob = new Blob(['﻿' + rows.map(r => r.join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = el('a'); a.href = URL.createObjectURL(blob); a.download = `혈압체중_${dayKey(Date.now())}.csv`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+};
+
+// ---------- AI 숫자 읽기 (Claude API, 선택) ----------
+const KEY_API = 'chulgeun-check-apikey';   // 같은 주소의 “아! 맞다” 앱과 키를 함께 쓴다
+const hasKey = () => { try { return !!localStorage.getItem(KEY_API); } catch (e) { return false; } };
+let clientPromise = null;
+function getClient() {
+  if (!clientPromise) {
+    clientPromise = import('https://esm.sh/@anthropic-ai/sdk@1.7.0').then(m => new m.default({
+      apiKey: localStorage.getItem(KEY_API),
+      dangerouslyAllowBrowser: true,   // 개인용 앱: 키는 사용자 본인 기기에만 있음
+      maxRetries: 1,
+      timeout: 40000,
+    }));
+    clientPromise.catch(() => { clientPromise = null; });
+  }
+  return clientPromise;
+}
+const READ = {
+  bp: {
+    system: `사용자가 가정용 혈압계 화면을 찍은 사진을 보냅니다. 화면에 표시된 수축기 혈압(SYS, 최고), 이완기 혈압(DIA, 최저), 맥박(PULSE)을 읽으세요.
+숫자가 또렷하게 보일 때만 읽고, 추측하지 마세요. 혈압계 화면이 아니거나 숫자가 잘리거나 흐려서 수축기·이완기 중 하나라도 확실하지 않으면 readable을 false로 하고 숫자는 모두 0으로 두세요.
+맥박이 화면에 없거나 확실하지 않으면 pulse만 0으로 두세요.`,
+    props: { readable: { type: 'boolean' }, systolic: { type: 'integer' }, diastolic: { type: 'integer' }, pulse: { type: 'integer' } },
+  },
+  wt: {
+    system: `사용자가 체중계 화면을 찍은 사진을 보냅니다. 화면에 표시된 체중을 kg 단위 숫자로 읽으세요(소수점 포함). 단위가 lb로 표시되어 있으면 kg으로 환산하세요.
+숫자가 또렷하게 보일 때만 읽고, 추측하지 마세요. 체중계 화면이 아니거나 숫자가 잘리거나 흐려서 확실하지 않으면 readable을 false로 하고 weight_kg은 0으로 두세요.`,
+    props: { readable: { type: 'boolean' }, weight_kg: { type: 'number' } },
+  },
+};
+async function readPhoto(type, dataUrl) {
+  const client = await getClient();
+  const res = await client.beta.messages.create({
+    model: 'claude-opus-5-5',
+    max_tokens: 4000,
+    betas: ['server-side-fallback-2026-07-01'],
+    fallbacks: 'default',
+    system: READ[type].system,
+    output_config: {
+      effort: 'low',
+      format: { type: 'json_schema', schema: { type: 'object', properties: READ[type].props, required: Object.keys(READ[type].props), additionalProperties: false } },
+    },
+    messages: [{ role: 'user', content: [
+      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: dataUrl.split(',')[1] } },
+      { type: 'text', text: '이 화면의 숫자를 읽어 주세요.' },
+    ] }],
+  });
+  if (res.stop_reason === 'refusal') return { readable: false };
+  return JSON.parse(res.content.find(b => b.type === 'text').text);
+}
+async function fillFromPhoto(d, full) {
+  let out = null;
+  try { out = await readPhoto(d.type, full); } catch (e) { console.error(e); }
+  if (draft !== d) return;                       // 기다리는 사이 창을 닫았으면 버린다
+  const set = (id, v) => { if ($(id).value === '' && v > 0) $(id).value = v; };   // 이미 적은 칸은 건드리지 않는다
+  if (out && out.readable) {
+    if (d.type === 'bp') { set('inSys', out.systolic); set('inDia', out.diastolic); set('inPulse', out.pulse); }
+    else set('inKg', Math.round(out.weight_kg * 10) / 10);
+    d.ai = true;
+    $('entryMsg').textContent = 'AI가 읽은 숫자예요. 사진과 맞는지 확인한 뒤 저장하세요.';
+  } else {
+    $('entryMsg').textContent = out ? 'AI가 숫자를 읽지 못했어요. 사진을 보고 직접 입력해 주세요.' : 'AI에 연결하지 못했어요. 사진을 보고 직접 입력해 주세요.';
+    $(d.type === 'bp' ? 'inSys' : 'inKg').focus();
+  }
+}
+$('keyForm').onsubmit = e => {
+  e.preventDefault();
+  const k = $('keyInput').value.trim(); if (!k) return;
+  localStorage.setItem(KEY_API, k); clientPromise = null; $('keyInput').value = ''; renderSettings();
+};
+$('keyClear').onclick = () => {
+  if (!confirm('저장된 API 키를 삭제할까요? “아! 맞다” 앱의 AI 판독도 함께 꺼져요.')) return;
+  localStorage.removeItem(KEY_API); clientPromise = null; renderSettings();
+};
+
+// ---------- 시작 ----------
+document.querySelectorAll('[data-range]').forEach(b => b.onclick = () => {
+  rangeDays = Number(b.dataset.range);
+  document.querySelectorAll('[data-range]').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+  renderCharts();
+});
+let lastW = innerWidth;
+addEventListener('resize', () => { if (innerWidth !== lastW) { lastW = innerWidth; renderCharts(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });   // 날짜가 넘어간 뒤 다시 열어도 “오늘”이 맞도록
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(console.error);
+}
+store('readonly', s => s.getAll())
+  .then(all => { recs = all.sort(byNewest); })
+  .catch(e => { console.error(e); alert('저장된 기록을 불러오지 못했어요. 브라우저의 사생활 보호 모드에서는 기록이 저장되지 않을 수 있어요.'); })
+  .finally(render);
+</script>
+</body>
+</html>
